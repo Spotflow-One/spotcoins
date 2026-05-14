@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPrisma = {
+  workspace: {
+    findUnique: vi.fn(),
+  },
   recognition: {
     findMany: vi.fn(),
   },
@@ -19,6 +22,7 @@ vi.mock("@/lib/db", () => ({
 describe("analyticsService.getAnalytics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.workspace.findUnique.mockResolvedValue({ timezone: "Africa/Lagos" });
   });
 
   it("calculates value counts correctly", async () => {
@@ -38,7 +42,7 @@ describe("analyticsService.getAnalytics", () => {
     ]);
 
     const { analyticsService } = await import("@/lib/services/analyticsService");
-    const result = await analyticsService.getAnalytics("ws-1", "this_month");
+    const result = await analyticsService.getAnalytics("ws-1", { mode: "preset", period: "this_month" });
 
     expect(result.valueCounts).toEqual([
       { valueId: "v1", name: "Ownership", emoji: "🔥", count: 2 },
@@ -67,7 +71,7 @@ describe("analyticsService.getAnalytics", () => {
     mockPrisma.companyValue.findMany.mockResolvedValue([]);
 
     const { analyticsService } = await import("@/lib/services/analyticsService");
-    const result = await analyticsService.getAnalytics("ws-1", "this_month");
+    const result = await analyticsService.getAnalytics("ws-1", { mode: "preset", period: "this_month" });
 
     expect(result.disengaged.map((user) => user.id)).toContain("u1");
     expect(result.disengaged.map((user) => user.id)).not.toContain("u2");

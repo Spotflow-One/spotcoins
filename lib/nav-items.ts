@@ -22,6 +22,7 @@ const employeeNavItems: NavItem[] = [
   { href: "/dashboard/polls", label: "Polls & Awards", icon: BarChart3 },
   { href: "/dashboard/events", label: "Events & Hangouts", icon: CalendarDays },
   { href: "/dashboard/recognise", label: "Recognise", icon: Heart },
+  { href: "/dashboard/leaderboard", label: "Leaderboard", icon: BarChart2 },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { href: "/dashboard/settings", label: "Account", icon: UserRound },
 ];
@@ -29,6 +30,7 @@ const employeeNavItems: NavItem[] = [
 const adminNavItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: House },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart2 },
+  { href: "/admin/wallet", label: "Wallet", icon: Wallet },
   { href: "/dashboard/polls", label: "Polls & Awards", icon: BarChart3 },
   { href: "/dashboard/events", label: "Events & Hangouts", icon: CalendarDays },
   { href: "/admin/settings", label: "Settings", icon: Settings },

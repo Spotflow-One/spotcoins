@@ -9,3 +9,4 @@ build
 coverage
 test-results
 *.tsbuildinfo
+public/uploads/

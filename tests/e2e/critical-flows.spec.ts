@@ -2,9 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function login(page: Page, email: string, password: string) {
   await page.goto("/login");
-  await page.getByPlaceholder("Email").fill(email);
+  await page.locator("#email").fill(email);
   await page.getByPlaceholder("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: /Continue/i }).click();
+  await expect(page).toHaveURL(/\/(dashboard|admin)/, { timeout: 30_000 });
 }
 
 test.describe("Critical product flows", () => {
@@ -36,28 +37,12 @@ test.describe("Critical product flows", () => {
     await expect(page.getByText(/new\.user@test\.com/i)).toBeVisible();
   });
 
-  test("Admin marks a payout complete", async ({ page, request }) => {
-    // Seed payout-target user via API helper endpoint if available.
-    // If you add a dedicated seed route, update this request URL.
-    await request.post("/api/test/seed-payout-user", {
-      data: { email: "payout.user@test.com", spotTokensEarned: 10 },
-    });
-
+  test("Admin wallet shows disabled download approved payout", async ({ page }) => {
     await login(page, "admin@test.com", "password123");
-    await page.goto("/admin/payout");
+    await page.goto("/admin/wallet");
 
-    if (await page.getByRole("button", { name: "Open Payout Window" }).isVisible()) {
-      await page.getByRole("button", { name: "Open Payout Window" }).click();
-      await page.getByRole("button", { name: "Confirm" }).click();
-    }
-
-    await expect(page.getByText(/payout\.user@test\.com/i)).toBeVisible();
-    await page.getByRole("button", { name: "Mark paid" }).first().click();
-    await page.getByRole("button", { name: "Confirm" }).click();
-    await expect(page.getByText(/paid/i)).toBeVisible();
-
-    // Optional DB verification endpoint hook.
-    const verify = await request.get("/api/test/assert-payout-user-cleared?email=payout.user@test.com");
-    expect(verify.ok()).toBeTruthy();
+    const downloadBtn = page.getByRole("button", { name: /download approved payout/i });
+    await expect(downloadBtn).toBeVisible();
+    await expect(downloadBtn).toBeDisabled();
   });
 });

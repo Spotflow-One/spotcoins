@@ -215,7 +215,7 @@ export default function RecognisePage() {
               const next = recipients.find((u) => u.id === id) ?? null;
               setSelectedRecipient(next);
             }}
-            className="h-12 w-full rounded-[12px] border border-border bg-input px-4 text-sm text-foreground outline-none transition-colors focus:border-border-strong focus:bg-card-2"
+            className="h-12 w-full rounded-[12px] border border-border bg-input pl-4 pr-10 text-sm text-foreground outline-none transition-colors focus:border-border-strong focus:bg-card-2"
           >
             <option value="">Select a teammate…</option>
             {recipients.map((user) => (

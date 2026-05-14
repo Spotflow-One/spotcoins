@@ -5,12 +5,13 @@ import { decrypt } from "../../lib/encryption";
 
 const logger = {
   info: (message: string, data?: unknown) =>
-    console.info(`[recognition-monday] ${message}`, data ?? ""),
+    console.info(`[recognition-friday] ${message}`, data ?? ""),
   error: (message: string, data?: unknown) =>
-    console.error(`[recognition-monday] ${message}`, data ?? ""),
+    console.error(`[recognition-friday] ${message}`, data ?? ""),
 };
 
-function isLastMondayOfMonth(date: Date): boolean {
+/** True when `date` is the last Friday of its calendar month (job runs on Fridays). */
+function isLastFridayOfMonth(date: Date): boolean {
   const candidate = new Date(date);
   candidate.setDate(candidate.getDate() + 7);
   return candidate.getMonth() !== date.getMonth();
@@ -39,14 +40,14 @@ export default async () => {
           continue;
         }
 
+        const schedule = workspace.recognitionSchedule;
         const shouldPost =
-          workspace.recognitionSchedule === "EVERY_MONDAY" ||
-          (workspace.recognitionSchedule === "LAST_MONDAY" && isLastMondayOfMonth(today));
+          schedule === "EVERY_FRIDAY" || (schedule === "LAST_FRIDAY" && isLastFridayOfMonth(today));
 
         if (!shouldPost) {
           logger.info("Skipping workspace due to schedule", {
             workspaceId: workspace.id,
-            schedule: workspace.recognitionSchedule,
+            schedule,
           });
           continue;
         }
@@ -67,7 +68,7 @@ export default async () => {
         const body = [
           "Hey <!channel> 🎉",
           "",
-          "It's Recognition Monday — time to shout out someone who made a difference last week.",
+          "It's Recognition Friday — time to shout out someone who made a difference this week.",
           "",
           "Who made your workday better? From going above and beyond to just being solid day in, day out — recognition is for all of it.",
           "",
@@ -77,10 +78,13 @@ export default async () => {
           "• Recognition takes less than 60 seconds",
         ].join("\n");
 
+        const slackPreview =
+          "It's Recognition Friday — time to shout out someone who made a difference this week.";
+
         const client = new WebClient(decrypt(installation.botToken));
         await client.chat.postMessage({
           channel: workspace.targetChannelId,
-          text: "It's Recognition Monday — time to shout out someone who made a difference last week.",
+          text: slackPreview,
           blocks: [
             {
               type: "section",
@@ -107,7 +111,7 @@ export default async () => {
           ],
         });
 
-        logger.info("Recognition Monday posted", {
+        logger.info("Recognition Friday posted", {
           workspaceId: workspace.id,
           channel: workspace.targetChannelId,
           timestamp: new Date().toISOString(),
@@ -137,5 +141,5 @@ export default async () => {
 };
 
 export const config: Config = {
-  schedule: "0 8 * * 1",
+  schedule: "0 8 * * 5",
 };

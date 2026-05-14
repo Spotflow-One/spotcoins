@@ -21,7 +21,8 @@ export const GET = requireAuth(async (_request, context, session) => {
     const id = context.params?.id;
     if (!id) throw new AppError("Missing event id", "INVALID_REQUEST", 400);
     const event = await eventService.get(id, session.user.workspaceId, session.user.id);
-    return success(event);
+    const canEdit = session.user.role === "ADMIN" || event.createdById === session.user.id;
+    return success({ ...event, canEdit });
   } catch (err) {
     return error(err);
   }

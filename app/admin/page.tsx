@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { MoreHorizontal, UserPlus, Users } from "lucide-react";
+import {
+  AdminUserMutationsSheet,
+  type AdminMutationUser,
+  type AdminUserMutationsRef,
+} from "@/components/admin/AdminUserMutationsSheet";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +31,7 @@ type AdminUser = {
   id: string;
   name: string;
   email: string;
+  feedDisplayName: string;
   avatarUrl: string | null;
   role: Role;
   coinsToGive: number;
@@ -33,6 +40,17 @@ type AdminUser = {
   deletedAt: string | null;
   position: { id: string; name: string } | null;
 };
+
+function userToMutationUser(user: AdminUser): AdminMutationUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    feedDisplayName: user.feedDisplayName,
+    role: user.role,
+    position: user.position ?? null,
+  };
+}
 
 function formatLastActive(dateValue: string | null) {
   if (!dateValue) return "Never";
@@ -57,27 +75,12 @@ export default function AdminPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
 
-  const [bonusUser, setBonusUser] = useState<AdminUser | null>(null);
-  const [bonusAmount, setBonusAmount] = useState(1);
-  const [bonusReason, setBonusReason] = useState("");
-
-  const [roleUser, setRoleUser] = useState<AdminUser | null>(null);
-  const [roleValue, setRoleValue] = useState<Role>("EMPLOYEE");
-
-  const [positionUser, setPositionUser] = useState<AdminUser | null>(null);
-  const [positionValue, setPositionValue] = useState<string>("");
-
-  const [deactivateUser, setDeactivateUser] = useState<AdminUser | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { toast, showToast } = useToast();
+  const mutationsRef = useRef<AdminUserMutationsRef>(null);
 
   const memberCount = useMemo(() => users.filter((user) => !user.deletedAt).length, [users]);
   const adminCount = useMemo(() => users.filter((user) => user.role === "ADMIN").length, [users]);
-
-  const activePositions = useMemo(
-    () => positions.filter((position) => position.isActive),
-    [positions],
-  );
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -125,104 +128,6 @@ export default function AdminPage() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleBonusGrant = async () => {
-    if (!bonusUser) return;
-    setIsSaving(true);
-    try {
-      const response = await fetch(`/api/admin/users/${bonusUser.id}/bonus`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ amount: bonusAmount, reason: bonusReason || undefined }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        showToast(payload.error ?? "Bonus update failed", "error");
-        return;
-      }
-      setBonusUser(null);
-      setBonusAmount(1);
-      setBonusReason("");
-      showToast("Bonus coins granted");
-      await loadUsers();
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleRoleChange = async () => {
-    if (!roleUser) return;
-    setIsSaving(true);
-    try {
-      const response = await fetch(`/api/admin/users/${roleUser.id}/role`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ role: roleValue }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        showToast(payload.error ?? "Role update failed", "error");
-        return;
-      }
-      setRoleUser(null);
-      showToast("User role updated");
-      await loadUsers();
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handlePositionChange = async () => {
-    if (!positionUser) return;
-    setIsSaving(true);
-    try {
-      const response = await fetch(`/api/admin/users/${positionUser.id}/position`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ positionId: positionValue || null }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        showToast(payload.error ?? "Position update failed", "error");
-        return;
-      }
-      setPositionUser(null);
-      setPositionValue("");
-      showToast("Position updated");
-      await loadUsers();
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeactivate = async () => {
-    if (!deactivateUser) return;
-    setIsSaving(true);
-    try {
-      const response = await fetch(`/api/admin/users/${deactivateUser.id}/deactivate`, {
-        method: "PATCH",
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        showToast(payload.error ?? "Deactivate failed", "error");
-        return;
-      }
-      setDeactivateUser(null);
-      showToast("User deactivated");
-      await loadUsers();
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const closeAllModals = () => {
-    setShowInviteModal(false);
-    setBonusUser(null);
-    setRoleUser(null);
-    setPositionUser(null);
-    setPositionValue("");
-    setDeactivateUser(null);
   };
 
   return (
@@ -279,55 +184,58 @@ export default function AdminPage() {
               key={user.id}
               className="flex items-center gap-3 rounded-[16px] border border-border bg-card px-4 py-3.5"
             >
-              <Avatar name={user.name} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {user.name}
-                  {user.deletedAt ? (
-                    <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-muted">
-                      Deactivated
-                    </span>
-                  ) : null}
-                </p>
-                <p className="truncate text-xs text-muted">
-                  {user.position?.name ? `${user.position.name} · ` : ""}
-                  {user.email} · Last active {formatLastActive(user.lastActiveAt)}
-                </p>
-              </div>
-              <Badge variant={roleVariant[user.role]} className="hidden sm:inline-flex">
-                {user.role}
-              </Badge>
+              <Link
+                href={`/admin/users/${user.id}`}
+                className="flex min-w-0 flex-1 items-center gap-3 transition-colors hover:opacity-90"
+              >
+                <Avatar name={user.feedDisplayName} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {user.feedDisplayName}
+                    {user.deletedAt ? (
+                      <span className="ml-2 text-[10px] uppercase tracking-[0.12em] text-muted">
+                        Deactivated
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="truncate text-xs text-muted">
+                    {user.name !== user.feedDisplayName ? `${user.name} · ` : ""}
+                    {user.position?.name ? `${user.position.name} · ` : ""}
+                    {user.email} · Last active {formatLastActive(user.lastActiveAt)}
+                  </p>
+                </div>
+                <Badge variant={roleVariant[user.role]} className="hidden sm:inline-flex">
+                  {user.role}
+                </Badge>
+              </Link>
               <Dropdown>
                 <DropdownTrigger asChild>
                   <button
                     type="button"
-                    aria-label={`Actions for ${user.name}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card-2 text-muted transition-colors hover:border-border-strong hover:text-foreground"
+                    aria-label={`Actions for ${user.feedDisplayName}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-card-2 text-muted transition-colors hover:border-border-strong hover:text-foreground"
                   >
                     <MoreHorizontal size={16} />
                   </button>
                 </DropdownTrigger>
                 <DropdownContent align="end">
-                  <DropdownItem onClick={() => setBonusUser(user)}>Grant bonus coins</DropdownItem>
+                  <DropdownItem onClick={() => mutationsRef.current?.openBonus(userToMutationUser(user))}>
+                    Grant bonus coins
+                  </DropdownItem>
                   <DropdownItem
-                    onClick={() => {
-                      setRoleUser(user);
-                      setRoleValue(user.role);
-                    }}
+                    onClick={() => mutationsRef.current?.openRole(userToMutationUser(user))}
                   >
                     Change role
                   </DropdownItem>
                   <DropdownItem
-                    onClick={() => {
-                      setPositionUser(user);
-                      setPositionValue(user.position?.id ?? "");
-                    }}
+                    onClick={() => mutationsRef.current?.openPosition(userToMutationUser(user))}
                   >
                     Change position
                   </DropdownItem>
                   <DropdownItem
                     className="text-destructive data-[highlighted]:bg-destructive/10"
-                    onClick={() => setDeactivateUser(user)}
+                    onClick={() => mutationsRef.current?.openDeactivate(userToMutationUser(user))}
                   >
                     Deactivate
                   </DropdownItem>
@@ -338,12 +246,7 @@ export default function AdminPage() {
         </ul>
       )}
 
-      <Sheet
-        open={showInviteModal || !!bonusUser || !!roleUser || !!positionUser || !!deactivateUser}
-        onOpenChange={(open) => {
-          if (!open) closeAllModals();
-        }}
-      >
+      <Sheet open={showInviteModal} onOpenChange={setShowInviteModal}>
         <SheetContent>
           {showInviteModal ? (
             <div className="space-y-4">
@@ -360,7 +263,7 @@ export default function AdminPage() {
                 placeholder="name@company.com"
               />
               <Button
-                onClick={handleInvite}
+                onClick={() => void handleInvite()}
                 disabled={isSaving || !inviteEmail}
                 className="w-full"
               >
@@ -368,115 +271,10 @@ export default function AdminPage() {
               </Button>
             </div>
           ) : null}
-
-          {bonusUser ? (
-            <div className="space-y-4">
-              <SheetHeader>
-                <SheetTitle>Grant bonus coins</SheetTitle>
-                <SheetDescription>For {bonusUser.name}</SheetDescription>
-              </SheetHeader>
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted">How many bonus coins?</label>
-                <Input
-                  value={bonusAmount}
-                  onChange={(event) => setBonusAmount(Math.max(1, Number(event.target.value) || 1))}
-                  type="number"
-                  min={1}
-                  max={50}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted">Reason (optional)</label>
-                <Input
-                  value={bonusReason}
-                  onChange={(event) => setBonusReason(event.target.value)}
-                  type="text"
-                  placeholder="e.g. great work on Q4 launch"
-                />
-              </div>
-              <Button onClick={handleBonusGrant} disabled={isSaving} className="w-full">
-                {isSaving ? "Granting..." : "Grant"}
-              </Button>
-            </div>
-          ) : null}
-
-          {roleUser ? (
-            <div className="space-y-4">
-              <SheetHeader>
-                <SheetTitle>Change role</SheetTitle>
-                <SheetDescription>For {roleUser.name}</SheetDescription>
-              </SheetHeader>
-              <select
-                value={roleValue}
-                onChange={(event) => setRoleValue(event.target.value as Role)}
-                className="h-12 w-full rounded-[12px] border border-border bg-input px-4 text-sm text-foreground outline-none transition-colors focus:border-border-strong"
-              >
-                <option value="EMPLOYEE">Employee</option>
-                <option value="MANAGER">Manager</option>
-                <option value="ADMIN">Admin</option>
-              </select>
-              <Button onClick={handleRoleChange} disabled={isSaving} className="w-full">
-                {isSaving ? "Saving..." : "Save role"}
-              </Button>
-            </div>
-          ) : null}
-
-          {positionUser ? (
-            <div className="space-y-4">
-              <SheetHeader>
-                <SheetTitle>Change position</SheetTitle>
-                <SheetDescription>For {positionUser.name}</SheetDescription>
-              </SheetHeader>
-              {activePositions.length === 0 ? (
-                <p className="text-xs text-muted">
-                  No positions configured yet. Add some in Settings first.
-                </p>
-              ) : (
-                <select
-                  value={positionValue}
-                  onChange={(event) => setPositionValue(event.target.value)}
-                  className="h-12 w-full rounded-[12px] border border-border bg-input px-4 text-sm text-foreground outline-none transition-colors focus:border-border-strong"
-                >
-                  <option value="">None</option>
-                  {activePositions.map((position) => (
-                    <option key={position.id} value={position.id}>
-                      {position.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <Button
-                onClick={handlePositionChange}
-                disabled={isSaving}
-                className="w-full"
-              >
-                {isSaving ? "Saving..." : "Save position"}
-              </Button>
-            </div>
-          ) : null}
-
-          {deactivateUser ? (
-            <div className="space-y-4">
-              <SheetHeader>
-                <SheetTitle>Deactivate user</SheetTitle>
-                <SheetDescription>
-                  {deactivateUser.name} will no longer be able to send or receive recognition.
-                </SheetDescription>
-              </SheetHeader>
-              <Button onClick={handleDeactivate} disabled={isSaving} variant="danger" className="w-full">
-                {isSaving ? "Deactivating..." : "Confirm deactivate"}
-              </Button>
-              <Button
-                onClick={() => setDeactivateUser(null)}
-                variant="outline"
-                className="w-full"
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : null}
         </SheetContent>
       </Sheet>
+
+      <AdminUserMutationsSheet ref={mutationsRef} positions={positions} onMutated={loadUsers} />
 
       <AppToast toast={toast} />
     </section>

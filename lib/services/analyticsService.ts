@@ -1,6 +1,17 @@
 import { prisma } from "@/lib/db";
+import {
+  startOfZonedMonth,
+  startOfZonedNextMonth,
+  startOfZonedNextQuarter,
+  startOfZonedQuarter,
+} from "@/lib/zonedRange";
 
 export type AnalyticsPeriod = "this_month" | "last_month" | "ytd";
+
+export type AnalyticsSpec =
+  | { mode: "preset"; period: AnalyticsPeriod }
+  | { mode: "month"; year: number; month: number }
+  | { mode: "quarter"; year: number; quarter: number };
 
 function getPeriodRange(period: AnalyticsPeriod) {
   const now = new Date();
@@ -27,13 +38,35 @@ function getPeriodRange(period: AnalyticsPeriod) {
 }
 
 export const analyticsService = {
-  async getAnalytics(workspaceId: string, period: AnalyticsPeriod) {
-    const { from, to } = getPeriodRange(period);
+  async getAnalytics(workspaceId: string, spec: AnalyticsSpec) {
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { timezone: true },
+    });
+    const tz = workspace?.timezone ?? "Africa/Lagos";
+
+    let from: Date;
+    let toExclusive: Date | null = null;
+    let toInclusive: Date | null = null;
+
+    if (spec.mode === "month") {
+      from = startOfZonedMonth(tz, spec.year, spec.month);
+      toExclusive = startOfZonedNextMonth(tz, spec.year, spec.month);
+    } else if (spec.mode === "quarter") {
+      from = startOfZonedQuarter(tz, spec.year, spec.quarter);
+      toExclusive = startOfZonedNextQuarter(tz, spec.year, spec.quarter);
+    } else {
+      const r = getPeriodRange(spec.period);
+      from = r.from;
+      toInclusive = r.to;
+    }
 
     const recognitions = await prisma.recognition.findMany({
       where: {
         workspaceId,
-        createdAt: { gte: from, lte: to },
+        createdAt: toExclusive
+          ? { gte: from, lt: toExclusive }
+          : { gte: from, lte: toInclusive! },
       },
       select: {
         senderId: true,

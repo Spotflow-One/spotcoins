@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DashboardHeroName } from "@/components/dashboard/DashboardHeroName";
 
 function formatHeroDate(date: Date) {
   const day = date.getDate();
@@ -17,6 +18,8 @@ function formatHeroDate(date: Date) {
 function formatNaira(value: number) {
   return `₦${value.toLocaleString("en-NG")}`;
 }
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -45,10 +48,6 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const username = user.username?.trim();
-  const firstName = user.name.split(" ")[0] || user.name;
-  const fallbackFromEmail = user.email.split("@")[0] || user.email;
-  const heroName = username || firstName || fallbackFromEmail;
   const projectedValue = user.spotTokensEarned * user.workspace.tokenValueNaira;
   const today = new Date();
   const monthName = today.toLocaleString("en-US", { month: "long" });
@@ -73,7 +72,7 @@ export default async function DashboardPage() {
       icon: Wallet,
     },
     {
-      href: "/admin/analytics",
+      href: "/dashboard/leaderboard",
       title: "Leaderboard",
       subtitle: "Top this month",
       icon: BarChart2,
@@ -88,9 +87,7 @@ export default async function DashboardPage() {
             LAGOS · {formatHeroDate(today)}
           </p>
           <div>
-            <h1 className="text-[32px] font-bold leading-[1.05] tracking-[-0.6px] text-foreground">
-              Hey {heroName}.
-            </h1>
+            <DashboardHeroName username={user.username} name={user.name} email={user.email} />
             <p className="text-[32px] font-bold leading-[1.05] tracking-[-0.6px] text-muted">
               Build. Ship. Connect.
             </p>

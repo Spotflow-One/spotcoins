@@ -122,6 +122,31 @@ export const positionService = {
     });
   },
 
+  async remove(adminId: string, positionId: string, workspaceId: string) {
+    await assertAdminAccess(adminId, workspaceId);
+
+    const inUse = await prisma.user.count({
+      where: { workspaceId, positionId, deletedAt: null },
+    });
+    if (inUse > 0) {
+      throw new AppError(
+        "Reassign users off this position before deleting it",
+        "POSITION_IN_USE",
+        400,
+      );
+    }
+
+    const existing = await prisma.position.findFirst({
+      where: { id: positionId, workspaceId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new AppError("Position not found", "POSITION_NOT_FOUND", 404);
+    }
+
+    await prisma.position.delete({ where: { id: positionId } });
+  },
+
   async toggle(adminId: string, positionId: string, workspaceId: string) {
     await assertAdminAccess(adminId, workspaceId);
 

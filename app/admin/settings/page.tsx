@@ -15,6 +15,7 @@ import {
   Plus,
   Slack,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { AppToast } from "@/components/ui/toast";
 import { Badge } from "@/components/ui/badge";
@@ -42,14 +43,21 @@ type Position = {
 
 type AdminUser = {
   id: string;
+  name: string;
+  email: string;
+  feedDisplayName: string;
+  role: "EMPLOYEE" | "MANAGER" | "ADMIN";
+  deletedAt: string | null;
   position: { id: string; name: string } | null;
 };
 
 type WorkspaceSettings = {
   id: string;
   name: string;
+  companyLegalName: string | null;
   monthlyAllowance: number;
   tokenValueNaira: number;
+  tokenValueGhs: number;
   slackTeamId: string | null;
   targetChannelId: string | null;
   recognitionSchedule: string;
@@ -59,8 +67,10 @@ type WorkspaceSettings = {
 
 type ModalState =
   | { type: "workspaceName"; value: string }
+  | { type: "companyLegalName"; value: string }
   | { type: "monthlyAllowance"; value: number }
   | { type: "tokenValueNaira"; value: number }
+  | { type: "tokenValueGhs"; value: number }
   | { type: "channelId"; value: string }
   | { type: "timezone"; value: string }
   | { type: "addValue"; name: string; emoji: string }
@@ -69,8 +79,8 @@ type ModalState =
   | null;
 
 const scheduleOptions = [
-  { id: "EVERY_MONDAY", label: "Every Monday" },
-  { id: "LAST_MONDAY", label: "Last Monday" },
+  { id: "EVERY_FRIDAY", label: "Every Friday" },
+  { id: "LAST_FRIDAY", label: "Last Friday" },
 ] as const;
 
 const emojiChoices = ["🔥", "🚀", "🤝", "🎯", "💡", "🌟", "⚡", "🧠", "🏆", "🙌"];
@@ -271,6 +281,28 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const deletePositionPermanently = async (position: Position) => {
+    const count = users.filter((u) => !u.deletedAt && u.position?.id === position.id).length;
+    if (count > 0) {
+      showToast("Reassign users before deleting this position", "error");
+      return;
+    }
+    if (!window.confirm(`Delete position “${position.name}”? This cannot be undone.`)) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/admin/positions/${position.id}`, { method: "DELETE" });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        showToast(payload.error ?? "Could not delete position", "error");
+        return;
+      }
+      showToast("Position deleted");
+      await Promise.all([loadPositions(), loadUsers()]);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const saveModal = async () => {
     if (!workspace || !modal) return;
 
@@ -289,6 +321,18 @@ export default function AdminSettingsPage() {
 
     if (modal.type === "tokenValueNaira") {
       const ok = await patchWorkspace({ tokenValueNaira: Math.max(1, modal.value) });
+      if (ok) setModal(null);
+      return;
+    }
+
+    if (modal.type === "tokenValueGhs") {
+      const ok = await patchWorkspace({ tokenValueGhs: Math.max(0, modal.value) });
+      if (ok) setModal(null);
+      return;
+    }
+
+    if (modal.type === "companyLegalName") {
+      const ok = await patchWorkspace({ companyLegalName: modal.value.trim() || null });
       if (ok) setModal(null);
       return;
     }
@@ -448,11 +492,31 @@ export default function AdminSettingsPage() {
           />
           <SettingRow
             icon={<Sparkles size={15} />}
-            title="Token value"
-            description="Naira per Spot Token at year-end"
+            title="Token value (NGN)"
+            description="Naira per Spot Token for Nigeria payouts"
             value={<span className="font-mono">₦{workspace.tokenValueNaira}</span>}
             onClick={() =>
               setModal({ type: "tokenValueNaira", value: workspace.tokenValueNaira })
+            }
+          />
+          <SettingRow
+            icon={<Sparkles size={15} />}
+            title="Token value (GHS)"
+            description="Cedi per Spot Token for Ghana payouts (0 = not set)"
+            value={<span className="font-mono">GH₵{workspace.tokenValueGhs}</span>}
+            onClick={() => setModal({ type: "tokenValueGhs", value: workspace.tokenValueGhs })}
+          />
+          <SettingRow
+            icon={<Hash size={15} />}
+            title="Company legal name"
+            value={
+              <span className="truncate">{workspace.companyLegalName || workspace.name}</span>
+            }
+            onClick={() =>
+              setModal({
+                type: "companyLegalName",
+                value: workspace.companyLegalName ?? workspace.name,
+              })
             }
           />
           <SettingRow
@@ -555,6 +619,17 @@ export default function AdminSettingsPage() {
                     >
                       {position.isActive ? "Active" : "Inactive"}
                     </Chip>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted hover:text-destructive"
+                      disabled={isSaving}
+                      title="Delete position"
+                      onClick={() => void deletePositionPermanently(position)}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
                   </div>
                 </div>
               ))
@@ -625,9 +700,9 @@ export default function AdminSettingsPage() {
             />
 
             <div className="rounded-[16px] border border-border bg-card p-4">
-              <p className="text-sm font-medium text-foreground">Recognition Monday</p>
+              <p className="text-sm font-medium text-foreground">Recognition Friday</p>
               <p className="mt-0.5 text-[11px] text-muted">
-                When Spotcoin nudges your team to send recognition
+                When Spotcoin nudges your team on Slack to send recognition
               </p>
               <div className="mt-3">
                 <Segmented
@@ -635,7 +710,13 @@ export default function AdminSettingsPage() {
                     id: option.id,
                     label: option.label,
                   }))}
-                  value={workspace.recognitionSchedule}
+                  value={
+                    workspace.recognitionSchedule === "EVERY_MONDAY"
+                      ? "EVERY_FRIDAY"
+                      : workspace.recognitionSchedule === "LAST_MONDAY"
+                        ? "LAST_FRIDAY"
+                        : workspace.recognitionSchedule
+                  }
                   onChange={(next) => void patchWorkspace({ recognitionSchedule: next })}
                 />
               </div>
@@ -672,8 +753,10 @@ export default function AdminSettingsPage() {
               <SheetHeader>
                 <SheetTitle>
                   {modal.type === "workspaceName" && "Workspace name"}
+                  {modal.type === "companyLegalName" && "Company legal name"}
                   {modal.type === "monthlyAllowance" && "Monthly coins per person"}
-                  {modal.type === "tokenValueNaira" && "Token value (₦)"}
+                  {modal.type === "tokenValueNaira" && "Token value (NGN)"}
+                  {modal.type === "tokenValueGhs" && "Token value (GH₵)"}
                   {modal.type === "channelId" && "Recognition channel"}
                   {modal.type === "timezone" && "Timezone"}
                   {modal.type === "addValue" && "Add company value"}
@@ -736,6 +819,18 @@ export default function AdminSettingsPage() {
                     className="mt-2"
                   />
                 </div>
+              ) : modal.type === "tokenValueGhs" ? (
+                <Input
+                  value={modal.value}
+                  onChange={(event) =>
+                    setModal({
+                      ...modal,
+                      value: Math.max(0, Number(event.target.value) || 0),
+                    })
+                  }
+                  type="number"
+                  min={0}
+                />
               ) : modal.type === "monthlyAllowance" || modal.type === "tokenValueNaira" ? (
                 <Input
                   value={modal.value}

@@ -20,8 +20,10 @@ async function assertAdminAccess(adminId: string, workspaceId: string) {
 
 type WorkspaceUpdateInput = Partial<{
   name: string;
+  companyLegalName: string | null;
   monthlyAllowance: number;
   tokenValueNaira: number;
+  tokenValueGhs: number;
   targetChannelId: string | null;
   recognitionSchedule: string;
   timezone: string;

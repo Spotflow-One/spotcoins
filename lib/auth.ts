@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import type { Session } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
+import { error } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { AppError } from "@/lib/errors";
@@ -105,7 +106,7 @@ export function requireAuth(handler: RouteHandler) {
   return async (request: Request, context: NextRouteContext) => {
     const session = await auth();
     if (!session?.user?.id || !session.user.workspaceId) {
-      throw new AppError("Authentication required", "UNAUTHORIZED", 401);
+      return error(new AppError("Authentication required", "UNAUTHORIZED", 401));
     }
     const params = await Promise.resolve(context?.params ?? {});
     return handler(request, { params }, session);
@@ -116,10 +117,10 @@ export function requireAdmin(handler: RouteHandler) {
   return async (request: Request, context: NextRouteContext) => {
     const session = await auth();
     if (!session?.user?.id || !session.user.workspaceId) {
-      throw new AppError("Authentication required", "UNAUTHORIZED", 401);
+      return error(new AppError("Authentication required", "UNAUTHORIZED", 401));
     }
     if (session.user.role !== "ADMIN") {
-      throw new AppError("Admin access required", "FORBIDDEN", 403);
+      return error(new AppError("Admin access required", "FORBIDDEN", 403));
     }
     const params = await Promise.resolve(context?.params ?? {});
     return handler(request, { params }, session);
@@ -130,10 +131,10 @@ export function requireAdminOrManager(handler: RouteHandler) {
   return async (request: Request, context: NextRouteContext) => {
     const session = await auth();
     if (!session?.user?.id || !session.user.workspaceId) {
-      throw new AppError("Authentication required", "UNAUTHORIZED", 401);
+      return error(new AppError("Authentication required", "UNAUTHORIZED", 401));
     }
     if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
-      throw new AppError("Admin or manager access required", "FORBIDDEN", 403);
+      return error(new AppError("Admin or manager access required", "FORBIDDEN", 403));
     }
     const params = await Promise.resolve(context?.params ?? {});
     return handler(request, { params }, session);

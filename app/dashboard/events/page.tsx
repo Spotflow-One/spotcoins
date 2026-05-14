@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useCanCreatePollsOrEvents } from "@/components/DashboardRoleProvider";
+import { EventCoverMedia } from "@/components/events/EventCoverMedia";
 
 type EventRow = {
   id: string;
@@ -39,7 +40,7 @@ export default function EventsPage() {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [venue, setVenue] = useState("");
-  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
@@ -70,6 +71,19 @@ export default function EventsPage() {
     }
     setSaving(true);
     try {
+      let coverImageUrl: string | null = null;
+      if (coverFile) {
+        const fd = new FormData();
+        fd.append("file", coverFile);
+        const up = await fetch("/api/events/cover-upload", { method: "POST", body: fd });
+        const uj = (await up.json()) as { data?: { url: string }; error?: string };
+        if (!up.ok) {
+          showToast(uj.error ?? "Could not upload cover image", "error");
+          return;
+        }
+        coverImageUrl = uj.data?.url ?? null;
+      }
+
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -78,7 +92,7 @@ export default function EventsPage() {
           description: description || null,
           location: location || null,
           venue: venue || null,
-          coverImageUrl: coverImageUrl || null,
+          coverImageUrl,
           linkUrl: linkUrl || null,
           startsAt: new Date(startsAt).toISOString(),
           endsAt: endsAt ? new Date(endsAt).toISOString() : null,
@@ -95,7 +109,7 @@ export default function EventsPage() {
       setDescription("");
       setLocation("");
       setVenue("");
-      setCoverImageUrl("");
+      setCoverFile(null);
       setLinkUrl("");
       setStartsAt("");
       setEndsAt("");
@@ -152,16 +166,10 @@ export default function EventsPage() {
               className="block rounded-2xl border border-border bg-card p-4 transition-colors hover:border-border-strong"
             >
               <div className="flex gap-3">
-                {ev.coverImageUrl ? (
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-border bg-card-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={ev.coverImageUrl} alt="" className="h-full w-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border border-border bg-card-2 text-muted">
-                    <CalendarDays size={22} />
-                  </div>
-                )}
+                <EventCoverMedia
+                  url={ev.coverImageUrl}
+                  frameClassName="aspect-[2/1] w-36 shrink-0 rounded-xl sm:w-44"
+                />
                 <div className="min-w-0 flex-1">
                   <h2 className="text-sm font-semibold text-foreground">{ev.title}</h2>
                   <p className="mt-1 text-[11px] text-muted">
@@ -214,8 +222,17 @@ export default function EventsPage() {
               </div>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted">Cover image URL</label>
-              <Input value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} placeholder="https://…" />
+              <label className="mb-1.5 block text-xs font-medium text-muted">Cover image</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="w-full text-sm text-foreground file:mr-3 file:rounded-lg file:border file:border-border file:bg-card-2 file:px-3 file:py-2 file:text-xs file:font-medium"
+                onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="mt-1.5 text-[11px] text-muted">
+                Recommended 1200×630 px (2:1). JPEG, PNG, or WebP, max 1.5 MB. On production, Netlify Blobs must be
+                configured.
+              </p>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted">External link</label>

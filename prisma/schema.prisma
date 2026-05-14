@@ -48,15 +48,28 @@ enum RsvpStatus {
   NOT_GOING
 }
 
+enum PayoutRequestCurrency {
+  NGN
+  GHS
+}
+
+enum PayoutRequestDecisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Workspace {
   id                  String   @id @default(cuid())
   name                String
+  companyLegalName    String?
   monthlyAllowance    Int      @default(5)
   tokenValueNaira     Int      @default(1000)
+  tokenValueGhs       Int      @default(0)
   slackTeamId         String?  @unique
   slackBotToken       String?
   targetChannelId     String?
-  recognitionSchedule String   @default("EVERY_MONDAY")
+  recognitionSchedule String   @default("EVERY_FRIDAY")
   timezone            String   @default("Africa/Lagos")
   onboardingComplete  Boolean  @default(false)
   createdAt           DateTime @default(now())
@@ -67,6 +80,7 @@ model Workspace {
   payoutWindows       PayoutWindow[]
   polls               Poll[]
   workspaceEvents     WorkspaceEvent[]
+  payoutRequests      PayoutRequest[]
 }
 
 model User {
@@ -84,6 +98,9 @@ model User {
   position             Position?         @relation(fields: [positionId], references: [id])
   coinsToGive          Int               @default(5)
   spotTokensEarned     Int               @default(0)
+  payoutBankName            String?
+  payoutBankAccountName   String?
+  payoutBankAccountNumber String?
   payoutStatus         PayoutStatus      @default(PENDING)
   lastActiveAt         DateTime?
   deletedAt            DateTime?
@@ -99,6 +116,8 @@ model User {
   workspaceEventsCreated WorkspaceEvent[] @relation("WorkspaceEventsCreated")
   eventRsvps           EventRsvp[]       @relation("EventRsvps")
   eventComments        EventComment[]    @relation("EventComments")
+  payoutRequestsCreated PayoutRequest[]  @relation("PayoutRequestUser")
+  payoutRequestsResolved PayoutRequest[] @relation("PayoutRequestResolvedBy")
 
   @@unique([workspaceId, username])
   @@index([workspaceId])
@@ -295,4 +314,26 @@ model EventComment {
   user      User           @relation("EventComments", fields: [userId], references: [id])
 
   @@index([eventId])
+}
+
+model PayoutRequest {
+  id                   String                     @id @default(cuid())
+  workspaceId        String
+  workspace            Workspace                  @relation(fields: [workspaceId], references: [id])
+  userId               String
+  user                 User                       @relation("PayoutRequestUser", fields: [userId], references: [id])
+  tokenAmount          Int
+  currency             PayoutRequestCurrency
+  status               PayoutRequestDecisionStatus @default(PENDING)
+  snapshotBankName         String?
+  snapshotBankNumber       String?
+  snapshotBankInstitution  String?
+  createdAt            DateTime                   @default(now())
+  resolvedAt           DateTime?
+  resolvedById         String?
+  resolvedBy           User?                      @relation("PayoutRequestResolvedBy", fields: [resolvedById], references: [id])
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([status])
 }

@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
+import { AppToast } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
+import { updateProfileUsername } from "./actions";
 
 type MeResponse = {
   data: {
@@ -14,7 +17,11 @@ type MeResponse = {
 };
 
 export default function DashboardSettingsPage() {
-  const { showToast } = useToast();
+  const router = useRouter();
+  const { toast, showToast } = useToast();
+  /** Bumped after a successful username PATCH so a slow GET cannot overwrite the saved value. */
+  const profileDataGeneration = useRef(0);
+  const profileLoadAbortRef = useRef<AbortController | null>(null);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [profileLoading, setProfileLoading] = useState(true);
@@ -26,10 +33,14 @@ export default function DashboardSettingsPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const ac = new AbortController();
+    profileLoadAbortRef.current = ac;
     const load = async () => {
+      const genAtFetch = profileDataGeneration.current;
       try {
-        const res = await fetch("/api/users/me", { cache: "no-store" });
+        const res = await fetch("/api/users/me", { cache: "no-store", signal: ac.signal });
         const json = (await res.json()) as MeResponse & { error?: string };
+        if (genAtFetch !== profileDataGeneration.current) return;
         if (!res.ok) {
           showToast(json.error ?? "Could not load profile", "error");
           return;
@@ -39,36 +50,39 @@ export default function DashboardSettingsPage() {
           setUsername(d.username ?? "");
           setEmail(d.email);
         }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        showToast("Could not load profile", "error");
       } finally {
         setProfileLoading(false);
       }
     };
     void load();
+    return () => {
+      ac.abort();
+      if (profileLoadAbortRef.current === ac) {
+        profileLoadAbortRef.current = null;
+      }
+    };
   }, [showToast]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    profileLoadAbortRef.current?.abort();
     setProfileSaving(true);
     try {
       const trimmed = username.trim();
-      const res = await fetch("/api/users/me", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username: trimmed === "" ? null : trimmed }),
-      });
-      const payload = (await res.json()) as MeResponse & { error?: string };
-
-      if (!res.ok) {
-        showToast(payload.error ?? "Could not update username", "error");
+      const result = await updateProfileUsername(trimmed === "" ? null : trimmed);
+      if (!result.ok) {
+        showToast(result.error, "error");
         return;
       }
 
+      profileDataGeneration.current += 1;
       showToast("Profile updated");
-      const d = payload.data;
-      if (d) {
-        setUsername(d.username ?? "");
-        setEmail(d.email);
-      }
+      setUsername(result.username ?? "");
+      setEmail(result.email);
+      router.refresh();
     } finally {
       setProfileSaving(false);
     }
@@ -109,7 +123,8 @@ export default function DashboardSettingsPage() {
   };
 
   return (
-    <div className="pb-8">
+    <>
+      <div className="pb-8">
       <PageHeader
         title="Account"
         description="Manage how you appear on the team feed and your sign-in password."
@@ -212,5 +227,7 @@ export default function DashboardSettingsPage() {
         </form>
       </section>
     </div>
+    <AppToast toast={toast} />
+  </>
   );
 }

@@ -25,6 +25,8 @@ const envSchema = z.object({
   RESEND_FROM: optionalString,
   REDIS_URL: optionalString,
   NEXT_PUBLIC_SUPPORT_EMAIL: optionalEmail,
+  NETLIFY_BLOB_READ_WRITE_TOKEN: optionalString,
+  NETLIFY_SITE_ID: optionalString,
 });
 
 const result = envSchema.safeParse(process.env);

@@ -15,7 +15,7 @@ export function AppShell({ children, isAdmin, role = "EMPLOYEE" }: AppShellProps
       <div className="md:flex">
         <Sidebar isAdmin={isAdmin} />
 
-        <div className="relative z-[1] min-w-0 flex-1 pb-28 md:pb-10">
+        <div className="relative z-[1] min-w-0 flex-1 pb-28 md:pb-10 md:pl-64">
           <header className="flex items-center justify-between border-b border-border bg-background/70 px-5 py-3.5 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-border bg-card">

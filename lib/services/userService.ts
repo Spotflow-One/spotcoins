@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { compare, hash } from "bcryptjs";
 import { Resend } from "resend";
-import type { Role } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { resendFromAddress } from "@/lib/resendFrom";
 import { env } from "@/lib/env";
@@ -13,6 +13,34 @@ import { recognitionService, type RecognitionHistoryFilters } from "@/lib/servic
 const resendClient = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 const INVITE_LINK_TTL_HOURS = 72;
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,30}$/;
+
+const getMeSelect = {
+  id: true,
+  email: true,
+  name: true,
+  username: true,
+  avatarUrl: true,
+  role: true,
+  workspaceId: true,
+  coinsToGive: true,
+  spotTokensEarned: true,
+  payoutStatus: true,
+  payoutBankName: true,
+  payoutBankAccountName: true,
+  payoutBankAccountNumber: true,
+  workspace: {
+    select: { name: true, tokenValueNaira: true, tokenValueGhs: true },
+  },
+} as const satisfies Prisma.UserSelect;
+
+type UserMeRow = Prisma.UserGetPayload<{ select: typeof getMeSelect }>;
+
+function toMeResponse(user: UserMeRow) {
+  return {
+    ...user,
+    feedDisplayName: publicFeedDisplayName({ username: user.username, email: user.email }),
+  };
+}
 
 async function assertAdminAccess(adminId: string, workspaceId: string) {
   const admin = await prisma.user.findFirst({
@@ -34,12 +62,13 @@ export const userService = {
   async listWorkspaceUsers(adminId: string, workspaceId: string) {
     await assertAdminAccess(adminId, workspaceId);
 
-    return prisma.user.findMany({
+    const rows = await prisma.user.findMany({
       where: { workspaceId },
       select: {
         id: true,
         name: true,
         email: true,
+        username: true,
         avatarUrl: true,
         role: true,
         coinsToGive: true,
@@ -52,79 +81,78 @@ export const userService = {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    return rows.map((row) => ({
+      ...row,
+      feedDisplayName: publicFeedDisplayName({ username: row.username, email: row.email }),
+    }));
   },
 
   async getMe(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        username: true,
-        avatarUrl: true,
-        role: true,
-        workspaceId: true,
-        coinsToGive: true,
-        spotTokensEarned: true,
-        payoutStatus: true,
-        workspace: {
-          select: { name: true, tokenValueNaira: true },
-        },
-      },
+      select: getMeSelect,
     });
 
     if (!user) {
       throw new AppError("User not found", "USER_NOT_FOUND", 404);
     }
 
-    return {
-      ...user,
-      feedDisplayName: publicFeedDisplayName({ username: user.username, email: user.email }),
-    };
+    return toMeResponse(user);
   },
 
   async updateOwnUsername(userId: string, username: string | null) {
-    const user = await prisma.user.findFirst({
-      where: { id: userId, deletedAt: null },
-      select: { workspaceId: true },
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.findFirst({
+        where: { id: userId, deletedAt: null },
+        select: { workspaceId: true },
+      });
+      if (!user) {
+        throw new AppError("User not found", "USER_NOT_FOUND", 404);
+      }
+
+      if (username === null || username.trim() === "") {
+        await tx.user.update({ where: { id: userId }, data: { username: null } });
+        const row = await tx.user.findUnique({ where: { id: userId }, select: getMeSelect });
+        if (!row) {
+          throw new AppError("User not found", "USER_NOT_FOUND", 404);
+        }
+        return toMeResponse(row);
+      }
+
+      const trimmed = username.trim();
+      if (!USERNAME_PATTERN.test(trimmed)) {
+        throw new AppError(
+          "Username must be 3–30 characters and use only letters, numbers, and underscores",
+          "INVALID_USERNAME",
+          400,
+        );
+      }
+
+      const clash = await tx.user.findFirst({
+        where: {
+          workspaceId: user.workspaceId,
+          id: { not: userId },
+          deletedAt: null,
+          username: { equals: trimmed, mode: "insensitive" },
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        throw new AppError("That username is already taken in your workspace", "USERNAME_TAKEN", 409);
+      }
+
+      await tx.user.update({
+        where: { id: userId },
+        data: { username: trimmed },
+      });
+
+      const row = await tx.user.findUnique({ where: { id: userId }, select: getMeSelect });
+      if (!row) {
+        throw new AppError("User not found", "USER_NOT_FOUND", 404);
+      }
+      return toMeResponse(row);
     });
-    if (!user) {
-      throw new AppError("User not found", "USER_NOT_FOUND", 404);
-    }
-
-    if (username === null || username.trim() === "") {
-      await prisma.user.update({ where: { id: userId }, data: { username: null } });
-      return this.getMe(userId);
-    }
-
-    const trimmed = username.trim();
-    if (!USERNAME_PATTERN.test(trimmed)) {
-      throw new AppError(
-        "Username must be 3–30 characters and use only letters, numbers, and underscores",
-        "INVALID_USERNAME",
-        400,
-      );
-    }
-
-    const clash = await prisma.user.findFirst({
-      where: {
-        workspaceId: user.workspaceId,
-        id: { not: userId },
-        deletedAt: null,
-        username: { equals: trimmed, mode: "insensitive" },
-      },
-      select: { id: true },
-    });
-    if (clash) {
-      throw new AppError("That username is already taken in your workspace", "USERNAME_TAKEN", 409);
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { username: trimmed },
-    });
-    return this.getMe(userId);
   },
 
   async changeOwnPassword(userId: string, currentPassword: string, newPassword: string) {
@@ -328,10 +356,30 @@ export const userService = {
   async deactivate(adminId: string, targetUserId: string, workspaceId: string) {
     await assertAdminAccess(adminId, workspaceId);
 
-    return prisma.user.updateMany({
+    const target = await prisma.user.findFirst({
+      where: { id: targetUserId, workspaceId, deletedAt: null },
+      select: { role: true },
+    });
+    if (!target) {
+      throw new AppError("Target user not found", "USER_NOT_FOUND", 404);
+    }
+    if (target.role === "ADMIN") {
+      const adminCount = await prisma.user.count({
+        where: { workspaceId, deletedAt: null, role: "ADMIN" },
+      });
+      if (adminCount <= 1) {
+        throw new AppError("Cannot remove the last admin in the workspace", "LAST_ADMIN", 400);
+      }
+    }
+
+    const result = await prisma.user.updateMany({
       where: { id: targetUserId, workspaceId, deletedAt: null },
       data: { deletedAt: new Date() },
     });
+    if (result.count === 0) {
+      throw new AppError("Target user not found", "USER_NOT_FOUND", 404);
+    }
+    return result;
   },
 
   async updateRole(adminId: string, targetUserId: string, workspaceId: string, role: Role) {

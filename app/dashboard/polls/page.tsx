@@ -290,7 +290,7 @@ export default function PollsPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted">Title</label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Employee of the quarter" />
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Favorite venue for codehouse" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted">Description (optional)</label>
