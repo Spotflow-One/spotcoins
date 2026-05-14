@@ -28,6 +28,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # NODE_ENV is often set to "production" in repo/docs; if the var is flagged "secret" in the Netlify UI,
+  # secret scanning flags the word "production" everywhere. Omit this key from env-secret value scanning.
+  SECRETS_SCAN_OMIT_KEYS = "NODE_ENV"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
