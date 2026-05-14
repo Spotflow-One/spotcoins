@@ -1,15 +1,30 @@
-# Netlify site ID: 8ace60f2-3284-4523-8ee8-29aaa0433051 (`npm run deploy` uses --site; see package.json).
+# -----------------------------------------------------------------------------
+# Netlify site (production)
+#   Site ID:     8ace60f2-3284-4523-8ee8-29aaa0433051
+#   Dashboard:   https://app.netlify.com/sites/spotcoin
+#
+# Trigger a production build on Netlify (no local upload; uses linked Git repo):
+#   npm run deploy:trigger
+#   → netlify deploy --prod --trigger --site 8ace60f2-3284-4523-8ee8-29aaa0433051
+#
+# Optional env (e.g. blobs): NETLIFY_SITE_ID=8ace60f2-3284-4523-8ee8-29aaa0433051
+# -----------------------------------------------------------------------------
 #
 # Secrets and URLs: set in Netlify UI (DATABASE_URL, DIRECT_URL, NEXTAUTH_*, etc.)
 #
-# Deploy reliability: do NOT set "Publish directory" to `.next` in the Netlify UI — leave it empty so
-# @netlify/plugin-nextjs owns output. Stale local `.netlify/` can make CLI uploads hang; `npm run deploy` clears it first.
-# Prefer Git-triggered builds on Netlify if CLI uploads keep stalling.
+# Deploy reliability (CLI 422 "no records matched" on upload):
+# - In the Netlify UI → Site configuration → Build & deploy → Build settings: clear "Publish directory"
+#   (leave empty). @netlify/plugin-nextjs must own publish output; a UI value of `.next` breaks uploads.
+# - After pushing to your linked Git branch, use `npm run deploy:trigger` to start production on Netlify
+#   without uploading from this machine.
+# - Stale local `.netlify/` can cause issues; `npm run deploy` clears it first.
 
 [build]
   # Temporary: skip Prisma migrate during deploy while DB connectivity is unstable.
   # Force production React/Next behavior; local `.env.local` may set NODE_ENV=development and break prerender.
   command = "NODE_ENV=production npm run build"
+  # Set in toml so publish uses `config` origin. UI-only publish (same `.next` path) has been linked to CLI 422 uploads.
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
