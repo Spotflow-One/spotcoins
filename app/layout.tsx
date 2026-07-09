@@ -6,14 +6,12 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Spotcoin",
   description: "Peer recognition platform",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`dark ${GeistSans.variable} ${GeistMono.variable}`}>
-      <head>
-        <meta name="color-scheme" content="dark" />
-      </head>
       <body className="min-h-screen bg-background font-sans text-foreground">{children}</body>
     </html>
   );
