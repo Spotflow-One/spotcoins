@@ -213,7 +213,7 @@ export default function AdminUserOverviewPage() {
         }
         backHref="/admin"
         action={
-          mutationUser && !isDeactivated ? (
+          mutationUser ? (
             <Dropdown>
               <DropdownTrigger asChild>
                 <button
@@ -226,14 +226,30 @@ export default function AdminUserOverviewPage() {
                 </button>
               </DropdownTrigger>
               <DropdownContent align="end">
-                <DropdownItem onClick={() => mutationsRef.current?.openBonus(mutationUser)}>Grant bonus coins</DropdownItem>
-                <DropdownItem onClick={() => mutationsRef.current?.openRole(mutationUser)}>Change role</DropdownItem>
-                <DropdownItem onClick={() => mutationsRef.current?.openPosition(mutationUser)}>Change position</DropdownItem>
+                {!isDeactivated ? (
+                  <>
+                    <DropdownItem onClick={() => mutationsRef.current?.openBonus(mutationUser)}>
+                      Grant bonus coins
+                    </DropdownItem>
+                    <DropdownItem onClick={() => mutationsRef.current?.openRole(mutationUser)}>
+                      Change role
+                    </DropdownItem>
+                    <DropdownItem onClick={() => mutationsRef.current?.openPosition(mutationUser)}>
+                      Change position
+                    </DropdownItem>
+                    <DropdownItem
+                      className="text-destructive data-[highlighted]:bg-destructive/10"
+                      onClick={() => mutationsRef.current?.openDeactivate(mutationUser)}
+                    >
+                      Deactivate
+                    </DropdownItem>
+                  </>
+                ) : null}
                 <DropdownItem
                   className="text-destructive data-[highlighted]:bg-destructive/10"
-                  onClick={() => mutationsRef.current?.openDeactivate(mutationUser)}
+                  onClick={() => mutationsRef.current?.openDelete(mutationUser)}
                 >
-                  Deactivate
+                  Delete permanently
                 </DropdownItem>
               </DropdownContent>
             </Dropdown>
@@ -448,6 +464,7 @@ export default function AdminUserOverviewPage() {
         positions={positions}
         onMutated={onMutated}
         afterDeactivate={() => router.push("/admin")}
+        afterDelete={() => router.push("/admin")}
       />
 
       <AppToast toast={toast} />

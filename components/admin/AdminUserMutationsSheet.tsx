@@ -24,6 +24,7 @@ export type AdminUserMutationsRef = {
   openRole: (user: AdminMutationUser) => void;
   openPosition: (user: AdminMutationUser) => void;
   openDeactivate: (user: AdminMutationUser) => void;
+  openDelete: (user: AdminMutationUser) => void;
 };
 
 type Props = {
@@ -31,10 +32,12 @@ type Props = {
   onMutated: () => Promise<void>;
   /** Called after successful deactivate (e.g. redirect to team list). */
   afterDeactivate?: () => void | Promise<void>;
+  /** Called after successful permanent delete. */
+  afterDelete?: () => void | Promise<void>;
 };
 
 export const AdminUserMutationsSheet = forwardRef<AdminUserMutationsRef, Props>(function AdminUserMutationsSheet(
-  { positions, onMutated, afterDeactivate },
+  { positions, onMutated, afterDeactivate, afterDelete },
   ref,
 ) {
   const { showToast } = useToast();
@@ -46,6 +49,8 @@ export const AdminUserMutationsSheet = forwardRef<AdminUserMutationsRef, Props>(
   const [positionUser, setPositionUser] = useState<AdminMutationUser | null>(null);
   const [positionValue, setPositionValue] = useState("");
   const [deactivateUser, setDeactivateUser] = useState<AdminMutationUser | null>(null);
+  const [deleteUser, setDeleteUser] = useState<AdminMutationUser | null>(null);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const activePositions = useMemo(
@@ -68,6 +73,10 @@ export const AdminUserMutationsSheet = forwardRef<AdminUserMutationsRef, Props>(
       setPositionValue(user.position?.id ?? "");
     },
     openDeactivate: (user) => setDeactivateUser(user),
+    openDelete: (user) => {
+      setDeleteUser(user);
+      setDeleteConfirmEmail("");
+    },
   }));
 
   const closeAll = () => {
@@ -76,6 +85,8 @@ export const AdminUserMutationsSheet = forwardRef<AdminUserMutationsRef, Props>(
     setPositionUser(null);
     setPositionValue("");
     setDeactivateUser(null);
+    setDeleteUser(null);
+    setDeleteConfirmEmail("");
   };
 
   const handleBonusGrant = async () => {
@@ -168,7 +179,33 @@ export const AdminUserMutationsSheet = forwardRef<AdminUserMutationsRef, Props>(
     }
   };
 
-  const open = !!(bonusUser || roleUser || positionUser || deactivateUser);
+  const handleDelete = async () => {
+    if (!deleteUser) return;
+    if (deleteConfirmEmail.trim().toLowerCase() !== deleteUser.email.toLowerCase()) {
+      showToast("Type the user’s email exactly to confirm", "error");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/admin/users/${deleteUser.id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        showToast(payload.error ?? "Delete failed", "error");
+        return;
+      }
+      setDeleteUser(null);
+      setDeleteConfirmEmail("");
+      showToast("User deleted permanently");
+      await onMutated();
+      await afterDelete?.();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const open = !!(bonusUser || roleUser || positionUser || deactivateUser || deleteUser);
 
   return (
     <Sheet
@@ -270,6 +307,51 @@ export const AdminUserMutationsSheet = forwardRef<AdminUserMutationsRef, Props>(
               {isSaving ? "Deactivating..." : "Confirm deactivate"}
             </Button>
             <Button onClick={() => setDeactivateUser(null)} variant="outline" className="w-full">
+              Cancel
+            </Button>
+          </div>
+        ) : null}
+
+        {deleteUser ? (
+          <div className="space-y-4">
+            <SheetHeader>
+              <SheetTitle>Delete permanently</SheetTitle>
+              <SheetDescription>
+                This cannot be undone. {deleteUser.feedDisplayName}&apos;s account, recognition history
+                involving them, and related records will be removed. Their email can be invited again.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted">
+                Type {deleteUser.email} to confirm
+              </label>
+              <Input
+                value={deleteConfirmEmail}
+                onChange={(event) => setDeleteConfirmEmail(event.target.value)}
+                type="email"
+                autoComplete="off"
+                placeholder={deleteUser.email}
+              />
+            </div>
+            <Button
+              onClick={() => void handleDelete()}
+              disabled={
+                isSaving ||
+                deleteConfirmEmail.trim().toLowerCase() !== deleteUser.email.toLowerCase()
+              }
+              variant="danger"
+              className="w-full"
+            >
+              {isSaving ? "Deleting..." : "Delete permanently"}
+            </Button>
+            <Button
+              onClick={() => {
+                setDeleteUser(null);
+                setDeleteConfirmEmail("");
+              }}
+              variant="outline"
+              className="w-full"
+            >
               Cancel
             </Button>
           </div>

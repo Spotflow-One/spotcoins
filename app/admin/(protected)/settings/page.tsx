@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { signOut } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
@@ -12,6 +13,7 @@ import {
   Clock,
   Coins,
   Hash,
+  LogOut,
   Plus,
   Slack,
   Sparkles,
@@ -134,6 +136,7 @@ export default function AdminSettingsPage() {
   const [positionsExpanded, setPositionsExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
   const { toast, showToast } = useToast();
   const [oauthBanner, setOauthBanner] = useState<{
@@ -256,6 +259,32 @@ export default function AdminSettingsPage() {
       }
       await loadSettings();
       showToast("Value updated");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteValue = async (value: CompanyValue) => {
+    if (
+      !window.confirm(
+        `Delete company value “${value.name}”? This cannot be undone. Values used in recognition history cannot be deleted.`,
+      )
+    ) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/admin/values/${value.id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        showToast(payload.error ?? "Unable to delete value", "error");
+        return;
+      }
+      await loadSettings();
+      showToast("Company value deleted");
     } finally {
       setIsSaving(false);
     }
@@ -546,13 +575,25 @@ export default function AdminSettingsPage() {
                   <span className="text-base">{value.emoji}</span>
                   <span className="truncate">{value.name}</span>
                 </span>
-                <Chip
-                  disabled={isSaving}
-                  onClick={() => void toggleValue(value)}
-                  selected={value.isActive}
-                >
-                  {value.isActive ? "Active" : "Inactive"}
-                </Chip>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Chip
+                    disabled={isSaving}
+                    onClick={() => void toggleValue(value)}
+                    selected={value.isActive}
+                  >
+                    {value.isActive ? "Active" : "Inactive"}
+                  </Chip>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => void deleteValue(value)}
+                    className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                    title={`Delete ${value.name}`}
+                    aria-label={`Delete ${value.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -741,6 +782,21 @@ export default function AdminSettingsPage() {
             className="flex w-full items-center justify-between gap-3 rounded-[16px] border border-destructive/30 bg-destructive/5 px-4 py-3.5 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
           >
             <span>Export all data</span>
+            <ChevronRight size={14} />
+          </button>
+          <button
+            type="button"
+            disabled={signingOut}
+            onClick={() => {
+              setSigningOut(true);
+              void signOut({ callbackUrl: "/admin/login" });
+            }}
+            className="flex w-full items-center justify-between gap-3 rounded-[16px] border border-destructive/30 bg-destructive/5 px-4 py-3.5 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
+          >
+            <span className="flex items-center gap-2">
+              <LogOut size={14} />
+              {signingOut ? "Signing out…" : "Sign out"}
+            </span>
             <ChevronRight size={14} />
           </button>
         </section>

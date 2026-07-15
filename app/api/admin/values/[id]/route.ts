@@ -29,3 +29,21 @@ export const PATCH = requireAdmin(async (request, context, session) => {
     return error(err);
   }
 });
+
+export const DELETE = requireAdmin(async (_request, context, session) => {
+  try {
+    const valueId = context.params?.id;
+    if (!valueId) {
+      throw new AppError("Missing value id", "INVALID_REQUEST", 400);
+    }
+
+    const result = await workspaceService.deleteValue(
+      session.user.id,
+      valueId,
+      session.user.workspaceId,
+    );
+    return success(result);
+  } catch (err) {
+    return error(err);
+  }
+});

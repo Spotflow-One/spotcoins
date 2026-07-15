@@ -131,4 +131,36 @@ export const workspaceService = {
       data: { isActive: !existing.isActive },
     });
   },
+
+  async deleteValue(adminId: string, valueId: string, workspaceId: string) {
+    await assertAdminAccess(adminId, workspaceId);
+
+    const existing = await prisma.companyValue.findFirst({
+      where: { id: valueId, workspaceId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new AppError("Company value not found", "VALUE_NOT_FOUND", 404);
+    }
+
+    const recognitionCount = await prisma.recognition.count({
+      where: { valueId, workspaceId },
+    });
+    if (recognitionCount > 0) {
+      throw new AppError(
+        "This value has recognition history and cannot be deleted. Deactivate it instead.",
+        "VALUE_IN_USE",
+        409,
+      );
+    }
+
+    const deleted = await prisma.companyValue.deleteMany({
+      where: { id: valueId, workspaceId },
+    });
+    if (deleted.count === 0) {
+      throw new AppError("Company value not found", "VALUE_NOT_FOUND", 404);
+    }
+
+    return { id: valueId, deleted: true as const };
+  },
 };

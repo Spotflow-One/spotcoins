@@ -13,8 +13,12 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const isAdminUser = session.user.role === "ADMIN";
+
+  // Dashboard always uses the employee shell, even for ADMIN session users
+  // who entered via /login. Their role is still ADMIN for API authorization.
   return (
-    <AppShell isAdmin={session.user.role === "ADMIN"} role={session.user.role}>
+    <AppShell isAdmin={false} role={session.user.role} showAdminLink={isAdminUser}>
       {children}
     </AppShell>
   );

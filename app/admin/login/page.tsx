@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 import { CredentialsLoginForm } from "@/components/CredentialsLoginForm";
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   return (
     <Suspense
       fallback={
@@ -21,7 +21,7 @@ export default function LoginPage() {
         </main>
       }
     >
-      <CredentialsLoginForm mode="user" />
+      <CredentialsLoginForm mode="admin" />
     </Suspense>
   );
 }

@@ -382,6 +382,94 @@ export const userService = {
     return result;
   },
 
+  async deleteUser(adminId: string, targetUserId: string, workspaceId: string) {
+    await assertAdminAccess(adminId, workspaceId);
+
+    if (adminId === targetUserId) {
+      throw new AppError("You cannot delete your own account", "SELF_DELETE", 400);
+    }
+
+    const target = await prisma.user.findFirst({
+      where: { id: targetUserId, workspaceId },
+      select: { id: true, role: true, deletedAt: true },
+    });
+    if (!target) {
+      throw new AppError("Target user not found", "USER_NOT_FOUND", 404);
+    }
+
+    if (target.role === "ADMIN" && !target.deletedAt) {
+      const adminCount = await prisma.user.count({
+        where: { workspaceId, deletedAt: null, role: "ADMIN" },
+      });
+      if (adminCount <= 1) {
+        throw new AppError("Cannot remove the last admin in the workspace", "LAST_ADMIN", 400);
+      }
+    }
+
+    const openPayoutWindow = await prisma.payoutWindow.findFirst({
+      where: { openedById: targetUserId, status: "OPEN" },
+      select: { id: true },
+    });
+    if (openPayoutWindow) {
+      throw new AppError(
+        "Close the open payout window before deleting this user",
+        "OPEN_PAYOUT_WINDOW",
+        400,
+      );
+    }
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.passwordResetToken.deleteMany({ where: { userId: targetUserId } });
+        await tx.pollVote.deleteMany({ where: { userId: targetUserId } });
+        await tx.pollOption.updateMany({
+          where: { optionUserId: targetUserId },
+          data: { optionUserId: null },
+        });
+        await tx.eventRsvp.deleteMany({ where: { userId: targetUserId } });
+        await tx.eventComment.deleteMany({ where: { userId: targetUserId } });
+        await tx.payoutRequest.updateMany({
+          where: { resolvedById: targetUserId },
+          data: { resolvedById: null },
+        });
+        await tx.payoutRequest.deleteMany({ where: { userId: targetUserId } });
+
+        const recognitions = await tx.recognition.findMany({
+          where: {
+            OR: [{ senderId: targetUserId }, { recipientId: targetUserId }],
+          },
+          select: { id: true },
+        });
+        const recognitionIds = recognitions.map((row) => row.id);
+        if (recognitionIds.length > 0) {
+          await tx.coinTransaction.deleteMany({
+            where: { referenceId: { in: recognitionIds } },
+          });
+          await tx.recognition.deleteMany({
+            where: { id: { in: recognitionIds } },
+          });
+        }
+
+        await tx.coinTransaction.deleteMany({ where: { userId: targetUserId } });
+        await tx.poll.deleteMany({ where: { createdById: targetUserId } });
+        await tx.workspaceEvent.deleteMany({ where: { createdById: targetUserId } });
+        await tx.payoutWindow.deleteMany({ where: { openedById: targetUserId } });
+
+        const deleted = await tx.user.deleteMany({
+          where: { id: targetUserId, workspaceId },
+        });
+        if (deleted.count === 0) {
+          throw new AppError("Target user not found", "USER_NOT_FOUND", 404);
+        }
+      });
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      throw new AppError("Unable to delete user", "DELETE_USER_FAILED", 500);
+    }
+
+    return { id: targetUserId, deleted: true as const };
+  },
+
   async updateRole(adminId: string, targetUserId: string, workspaceId: string, role: Role) {
     await assertAdminAccess(adminId, workspaceId);
 

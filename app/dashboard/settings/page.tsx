@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ export default function DashboardSettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -225,6 +227,23 @@ export default function DashboardSettingsPage() {
             {saving ? "Saving…" : "Update password"}
           </Button>
         </form>
+      </section>
+
+      <section className="mt-8 rounded-2xl border border-destructive/30 bg-destructive/5 p-6">
+        <h2 className="text-sm font-semibold text-foreground">Sign out</h2>
+        <p className="mt-1 text-xs text-muted">End your session on this device.</p>
+        <Button
+          type="button"
+          variant="danger"
+          className="mt-4"
+          disabled={signingOut}
+          onClick={() => {
+            setSigningOut(true);
+            void signOut({ callbackUrl: "/login" });
+          }}
+        >
+          {signingOut ? "Signing out…" : "Sign out"}
+        </Button>
       </section>
     </div>
     <AppToast toast={toast} />

@@ -13,7 +13,7 @@ function redirectToAdminSlackStatus(status: string) {
 async function redirectSlackOAuthIssue(status: string) {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "ADMIN") {
-    const login = new URL(`${env.NEXT_PUBLIC_APP_URL}/login`);
+    const login = new URL(`${env.NEXT_PUBLIC_APP_URL}/admin/login`);
     login.searchParams.set("slack", status);
     login.searchParams.set("redirect", "/api/slack/oauth/start");
     return Response.redirect(login.toString(), 302);
