@@ -17,9 +17,19 @@ function connectionStringOrPlaceholder() {
   return "postgresql://prisma:prisma@127.0.0.1:5432/prisma";
 }
 
+function needsSsl(connectionString: string) {
+  if (/sslmode=disable/i.test(connectionString)) return false;
+  if (/localhost|127\.0\.0\.1/i.test(connectionString)) return false;
+  // Managed Postgres (RDS, Supabase, etc.) typically requires TLS.
+  return true;
+}
+
 function createPrismaClient() {
   const connectionString = connectionStringOrPlaceholder();
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({
+    connectionString,
+    ...(needsSsl(connectionString) ? { ssl: { rejectUnauthorized: false } } : {}),
+  });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }
