@@ -5,7 +5,7 @@
     "postinstall": "prisma generate",
     "predev": "prisma generate",
     "dev": "next dev",
-    "build": "prisma generate && NODE_ENV=production next build",
+    "build": "prisma migrate deploy && NODE_ENV=production next build",
     "deploy": "rm -rf .netlify && prisma generate && netlify deploy --prod --build --skip-functions-cache --site 8ace60f2-3284-4523-8ee8-29aaa0433051",
     "deploy:trigger": "netlify deploy --prod --trigger --site 8ace60f2-3284-4523-8ee8-29aaa0433051",
     "deploy:upload": "netlify deploy --prod --skip-functions-cache --site 8ace60f2-3284-4523-8ee8-29aaa0433051",
