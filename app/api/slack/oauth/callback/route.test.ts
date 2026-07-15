@@ -70,7 +70,7 @@ describe("Slack OAuth callback route", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/login?slack=oauth_denied&redirect=%2Fapi%2Fslack%2Foauth%2Fstart",
+      "http://localhost:3000/admin/login?slack=oauth_denied&redirect=%2Fapi%2Fslack%2Foauth%2Fstart",
     );
   });
 
@@ -79,7 +79,7 @@ describe("Slack OAuth callback route", () => {
     const response = await GET(new Request("http://localhost:3000/api/slack/oauth/callback?state=abc"));
 
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/login?slack=missing_code&redirect=%2Fapi%2Fslack%2Foauth%2Fstart",
+      "http://localhost:3000/admin/login?slack=missing_code&redirect=%2Fapi%2Fslack%2Foauth%2Fstart",
     );
   });
 
@@ -93,7 +93,7 @@ describe("Slack OAuth callback route", () => {
     );
 
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/login?slack=invalid_state&redirect=%2Fapi%2Fslack%2Foauth%2Fstart",
+      "http://localhost:3000/admin/login?slack=invalid_state&redirect=%2Fapi%2Fslack%2Foauth%2Fstart",
     );
   });
 

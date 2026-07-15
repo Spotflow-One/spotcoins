@@ -7,7 +7,7 @@ const scopes = ["commands", "chat:write", "chat:write.public", "users:read", "us
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id || !session.user.workspaceId) {
-    const login = new URL(`${env.NEXT_PUBLIC_APP_URL}/login`);
+    const login = new URL(`${env.NEXT_PUBLIC_APP_URL}/admin/login`);
     login.searchParams.set("redirect", "/api/slack/oauth/start");
     return Response.redirect(login.toString(), 302);
   }

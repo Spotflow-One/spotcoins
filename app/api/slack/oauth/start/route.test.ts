@@ -30,7 +30,7 @@ describe("Slack OAuth start route", () => {
     expect(response.status).toBe(302);
     const location = response.headers.get("location");
     expect(location).toBe(
-      "http://localhost:3000/login?redirect=%2Fapi%2Fslack%2Foauth%2Fstart",
+      "http://localhost:3000/admin/login?redirect=%2Fapi%2Fslack%2Foauth%2Fstart",
     );
   });
 

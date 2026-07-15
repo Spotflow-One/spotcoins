@@ -239,6 +239,12 @@ export default function AdminPage() {
                   >
                     Deactivate
                   </DropdownItem>
+                  <DropdownItem
+                    className="text-destructive data-[highlighted]:bg-destructive/10"
+                    onClick={() => mutationsRef.current?.openDelete(userToMutationUser(user))}
+                  >
+                    Delete permanently
+                  </DropdownItem>
                 </DropdownContent>
               </Dropdown>
             </li>

@@ -8,11 +8,12 @@ import { cn } from "@/lib/utils";
 
 type SidebarProps = {
   isAdmin: boolean;
+  showAdminLink?: boolean;
 };
 
-export function Sidebar({ isAdmin }: SidebarProps) {
+export function Sidebar({ isAdmin, showAdminLink = false }: SidebarProps) {
   const pathname = usePathname();
-  const items = getNavItems(isAdmin);
+  const items = getNavItems(isAdmin, { includeAdminLink: showAdminLink });
 
   return (
     <aside className="fixed left-0 top-0 z-30 hidden h-[100dvh] w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-background/40 backdrop-blur md:flex">
@@ -32,10 +33,13 @@ export function Sidebar({ isAdmin }: SidebarProps) {
             const Icon = item.icon;
             const active =
               pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+              (item.href !== "/dashboard" &&
+                item.href !== "/admin" &&
+                pathname.startsWith(`${item.href}/`)) ||
+              (item.href === "/admin" && pathname.startsWith("/admin"));
             return (
               <Link
-                key={item.href}
+                key={`${item.href}-${item.label}`}
                 href={item.href}
                 className={cn(
                   "flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-sm transition-colors",

@@ -7,13 +7,20 @@ type AppShellProps = {
   children: React.ReactNode;
   isAdmin: boolean;
   role?: DashboardRole;
+  /** When using the employee shell, show a link back to /admin for ADMIN role users. */
+  showAdminLink?: boolean;
 };
 
-export function AppShell({ children, isAdmin, role = "EMPLOYEE" }: AppShellProps) {
+export function AppShell({
+  children,
+  isAdmin,
+  role = "EMPLOYEE",
+  showAdminLink = false,
+}: AppShellProps) {
   return (
     <main className="app-top-glow relative min-h-screen overflow-hidden bg-background">
       <div className="md:flex">
-        <Sidebar isAdmin={isAdmin} />
+        <Sidebar isAdmin={isAdmin} showAdminLink={showAdminLink} />
 
         <div className="relative z-[1] min-w-0 flex-1 pb-28 md:pb-10 md:pl-64">
           <header className="flex items-center justify-between border-b border-border bg-background/70 px-5 py-3.5 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
@@ -23,7 +30,7 @@ export function AppShell({ children, isAdmin, role = "EMPLOYEE" }: AppShellProps
               </div>
               <span className="text-sm font-semibold tracking-tight text-foreground">Spotcoin</span>
             </div>
-            {isAdmin ? (
+            {isAdmin || showAdminLink ? (
               <span className="rounded-full border border-border bg-card-2 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted">
                 Admin
               </span>
@@ -36,7 +43,7 @@ export function AppShell({ children, isAdmin, role = "EMPLOYEE" }: AppShellProps
         </div>
       </div>
 
-      <BottomNav isAdmin={isAdmin} />
+      <BottomNav isAdmin={isAdmin} showAdminLink={showAdminLink} />
     </main>
   );
 }

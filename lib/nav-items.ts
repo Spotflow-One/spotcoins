@@ -6,6 +6,7 @@ import {
   Heart,
   House,
   Settings,
+  Shield,
   UserRound,
   Wallet,
 } from "lucide-react";
@@ -37,6 +38,17 @@ const adminNavItems: NavItem[] = [
   { href: "/dashboard/settings", label: "Account", icon: UserRound },
 ];
 
-export function getNavItems(isAdmin: boolean) {
-  return isAdmin ? adminNavItems : employeeNavItems;
+/** Employee shell; admins also get an escape hatch back to the admin console. */
+export function getEmployeeNavItems(options?: { includeAdminLink?: boolean }) {
+  if (!options?.includeAdminLink) {
+    return employeeNavItems;
+  }
+  return [
+    ...employeeNavItems,
+    { href: "/admin", label: "Admin", icon: Shield },
+  ];
+}
+
+export function getNavItems(isAdmin: boolean, options?: { includeAdminLink?: boolean }) {
+  return isAdmin ? adminNavItems : getEmployeeNavItems(options);
 }
