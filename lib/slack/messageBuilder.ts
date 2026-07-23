@@ -115,7 +115,7 @@ export function buildPublicPost(
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `🎉 Big shoutout to ${recipientLabel} for living our value(s): *${valueLabel}* 👏`,
+        text: `🎉 *${sender.name}* sends a big shoutout to ${recipientLabel} for living our value(s): *${valueLabel}* 👏`,
       },
     },
     {

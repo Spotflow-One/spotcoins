@@ -136,11 +136,11 @@ export default function DashboardSettingsPage() {
         <h2 className="text-sm font-semibold text-foreground">Feed username</h2>
         <p className="mt-1 text-xs text-muted">
           This is how your name appears on the recognition feed and in Slack recognition posts. If you leave
-          username empty, your sign-in email is shown instead
+          username empty, the part before @ in your email is shown instead
           {email ? (
             <>
               {" "}
-              (<span className="font-mono">{email}</span>).
+              (<span className="font-mono">{email.split("@")[0] || email}</span>).
             </>
           ) : (
             "."

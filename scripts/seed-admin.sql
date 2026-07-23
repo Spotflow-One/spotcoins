@@ -48,6 +48,7 @@ INSERT INTO "User" (
   id,
   email,
   name,
+  username,
   "passwordHash",
   role,
   "workspaceId",
@@ -61,6 +62,7 @@ VALUES (
   'usr_spotflow_admin',
   'michael@spotflow.one',
   'Michael',
+  'michael',
   '$2b$12$6SkfJMu7b7wjY6nBVGmMyOCULuT2TC2sMr2OS80jDcVBcdOgQ/f2e',
   'ADMIN'::"Role",
   'ws_spotflow',
@@ -72,6 +74,7 @@ VALUES (
 )
 ON CONFLICT (email) DO UPDATE SET
   name           = EXCLUDED.name,
+  username       = COALESCE("User".username, EXCLUDED.username),
   "passwordHash" = EXCLUDED."passwordHash",
   role           = 'ADMIN'::"Role",
   "workspaceId"  = EXCLUDED."workspaceId",
