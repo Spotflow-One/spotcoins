@@ -27,6 +27,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPPORT_EMAIL: optionalEmail,
   NETLIFY_BLOB_READ_WRITE_TOKEN: optionalString,
   NETLIFY_SITE_ID: optionalString,
+  /** Shared secret for Vercel Cron / manual job triggers (`Authorization: Bearer …`). */
+  CRON_SECRET: optionalString,
 });
 
 const result = envSchema.safeParse(process.env);

@@ -1,11 +1,13 @@
+import { emailLocalPart } from "@/lib/usernameFromEmail";
+
 /**
  * Label shown on the public recognition feed (and related team-facing surfaces).
- * Prefer workspace username when set; otherwise fall back to email.
+ * Prefer workspace username when set; otherwise fall back to the email local part.
  */
 export function publicFeedDisplayName(user: { username: string | null; email: string }): string {
   const handle = user.username?.trim();
   if (handle) return handle;
-  return user.email;
+  return emailLocalPart(user.email);
 }
 
 /**
@@ -22,6 +24,5 @@ export function dashboardHeroGreetingName(user: {
   const nm = (user.name || "").trim();
   const first = nm.split(/\s+/)[0] || nm;
   if (first) return first;
-  const emailLocal = user.email.split("@")[0] || user.email;
-  return emailLocal;
+  return emailLocalPart(user.email);
 }

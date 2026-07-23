@@ -137,6 +137,7 @@ export default function AdminSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [sendingFriday, setSendingFriday] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
   const { toast, showToast } = useToast();
   const [oauthBanner, setOauthBanner] = useState<{
@@ -468,6 +469,21 @@ export default function AdminSettingsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleSendRecognitionFriday = async () => {
+    setSendingFriday(true);
+    try {
+      const response = await fetch("/api/admin/recognition-friday", { method: "POST" });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        showToast(payload.error ?? "Could not send Recognition Friday", "error");
+        return;
+      }
+      showToast("Recognition Friday posted to Slack");
+    } finally {
+      setSendingFriday(false);
+    }
+  };
+
   if (isLoading || !workspace) {
     return (
       <section className="pb-10">
@@ -760,6 +776,26 @@ export default function AdminSettingsPage() {
                   }
                   onChange={(next) => void patchWorkspace({ recognitionSchedule: next })}
                 />
+              </div>
+              <div className="mt-3 space-y-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={
+                    sendingFriday ||
+                    !workspace.slackTeamId ||
+                    !workspace.targetChannelId
+                  }
+                  onClick={() => void handleSendRecognitionFriday()}
+                >
+                  {sendingFriday ? "Sending..." : "Send now"}
+                </Button>
+                {(!workspace.slackTeamId || !workspace.targetChannelId) && (
+                  <p className="text-[11px] text-muted">
+                    Connect Slack and set a recognition channel to send now.
+                  </p>
+                )}
               </div>
             </div>
 

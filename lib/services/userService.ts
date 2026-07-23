@@ -9,10 +9,10 @@ import { AppError } from "@/lib/errors";
 import { publicFeedDisplayName } from "@/lib/publicDisplayName";
 import { hashResetToken } from "@/lib/services/passwordResetService";
 import { recognitionService, type RecognitionHistoryFilters } from "@/lib/services/recognitionService";
+import { allocateUsernameFromEmail, USERNAME_PATTERN } from "@/lib/usernameFromEmail";
 
 const resendClient = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 const INVITE_LINK_TTL_HOURS = 72;
-const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,30}$/;
 
 const getMeSelect = {
   id: true,
@@ -249,11 +249,24 @@ export const userService = {
 
     const temporaryPassword = randomBytes(8).toString("hex");
     const passwordHash = await hash(temporaryPassword, 12);
+    const localName = normalizedEmail.split("@")[0] || "New User";
+    const username = await allocateUsernameFromEmail(normalizedEmail, async (candidate) => {
+      const clash = await prisma.user.findFirst({
+        where: {
+          workspaceId,
+          deletedAt: null,
+          username: { equals: candidate, mode: "insensitive" },
+        },
+        select: { id: true },
+      });
+      return Boolean(clash);
+    });
 
     const createdUser = await prisma.user.create({
       data: {
         email: normalizedEmail,
-        name: normalizedEmail.split("@")[0] || "New User",
+        name: localName,
+        username,
         passwordHash,
         role: "EMPLOYEE",
         workspaceId,
@@ -262,6 +275,7 @@ export const userService = {
         id: true,
         email: true,
         name: true,
+        username: true,
         role: true,
         coinsToGive: true,
       },

@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/recognition-friday",
+      "schedule": "0 8 * * 5"
+    },
+    {
+      "path": "/api/cron/monthly-reset",
+      "schedule": "1 23 31 * *"
+    }
+  ]
+}

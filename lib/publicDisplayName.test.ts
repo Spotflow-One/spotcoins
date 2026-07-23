@@ -6,9 +6,9 @@ describe("publicFeedDisplayName", () => {
     expect(publicFeedDisplayName({ username: "  alex_k ", email: "alex@corp.com" })).toBe("alex_k");
   });
 
-  it("falls back to email when username is empty", () => {
-    expect(publicFeedDisplayName({ username: null, email: "pat@corp.com" })).toBe("pat@corp.com");
-    expect(publicFeedDisplayName({ username: "", email: "pat@corp.com" })).toBe("pat@corp.com");
+  it("falls back to email local part when username is empty", () => {
+    expect(publicFeedDisplayName({ username: null, email: "pat@corp.com" })).toBe("pat");
+    expect(publicFeedDisplayName({ username: "", email: "pat@corp.com" })).toBe("pat");
   });
 });
 

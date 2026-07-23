@@ -10,18 +10,11 @@ const mockPrisma = {
   $transaction: vi.fn(),
 };
 
-vi.mock("../../lib/db", () => ({
+vi.mock("@/lib/db", () => ({
   prisma: mockPrisma,
 }));
 
-vi.mock("../../lib/jobs/monthlyReset", async () => {
-  const actual = await vi.importActual<typeof import("../../lib/jobs/monthlyReset")>(
-    "../../lib/jobs/monthlyReset",
-  );
-  return actual;
-});
-
-describe("monthly-reset Netlify wrapper", () => {
+describe("runMonthlyResetJob", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -40,8 +33,8 @@ describe("monthly-reset Netlify wrapper", () => {
     };
     mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(tx));
 
-    const monthlyReset = (await import("../../netlify/functions/monthly-reset.mts")).default;
-    await monthlyReset();
+    const { runMonthlyResetJob } = await import("@/lib/jobs/monthlyReset");
+    await runMonthlyResetJob({ requireLagosMonthStart: false });
 
     expect(tx.user.update).toHaveBeenCalled();
     const updateCalls = tx.user.update.mock.calls.map((call: any[]) => call[0]);
@@ -49,5 +42,16 @@ describe("monthly-reset Netlify wrapper", () => {
       expect(call.data).toHaveProperty("coinsToGive", 5);
       expect(call.data).not.toHaveProperty("spotTokensEarned");
     }
+  });
+
+  it("skips when Lagos month-start gate fails", async () => {
+    const { runMonthlyResetJob } = await import("@/lib/jobs/monthlyReset");
+    // Mid-month UTC instant that is not day 1 in Lagos
+    const result = await runMonthlyResetJob({
+      now: new Date("2026-07-15T12:00:00.000Z"),
+      requireLagosMonthStart: true,
+    });
+    expect(result.skipped).toBe(true);
+    expect(mockPrisma.workspace.findMany).not.toHaveBeenCalled();
   });
 });
