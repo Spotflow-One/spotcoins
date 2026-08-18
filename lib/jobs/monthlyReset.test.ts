@@ -54,4 +54,20 @@ describe("runMonthlyResetJob", () => {
     expect(result.skipped).toBe(true);
     expect(mockPrisma.workspace.findMany).not.toHaveBeenCalled();
   });
+
+  it("runs when instant is day 1 in Lagos even if UTC is prior day", async () => {
+    mockPrisma.workspace.findMany.mockResolvedValue([{ id: "ws-1", monthlyAllowance: 5 }]);
+    mockPrisma.user.findMany.mockResolvedValue([]);
+
+    const { runMonthlyResetJob } = await import("@/lib/jobs/monthlyReset");
+    // 23:30 UTC on Jul 31 is 00:30 Aug 1 in Africa/Lagos.
+    const result = await runMonthlyResetJob({
+      now: new Date("2026-07-31T23:30:00.000Z"),
+      requireLagosMonthStart: true,
+    });
+
+    expect(result.skipped).toBeUndefined();
+    expect(result.totalResetUsers).toBe(0);
+    expect(mockPrisma.workspace.findMany).toHaveBeenCalled();
+  });
 });

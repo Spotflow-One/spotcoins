@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/monthly-reset",
-      "schedule": "1 23 31 * *"
+      "schedule": "1 23 * * *"
     }
   ]
 }
