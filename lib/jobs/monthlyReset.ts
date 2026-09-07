@@ -1,5 +1,6 @@
 import { toZonedTime } from "date-fns-tz";
 import { prisma } from "@/lib/db";
+import { AppError } from "@/lib/errors";
 
 const LAGOS_TZ = "Africa/Lagos";
 
@@ -14,12 +15,76 @@ export type MonthlyResetResult = {
   skipped?: boolean;
   reason?: string;
   totalResetUsers: number;
+  failedWorkspaces?: Array<{ workspaceId: string; error: string }>;
 };
 
 /** True when the given instant is day 1 in Africa/Lagos. */
 export function isLagosMonthStart(now = new Date()): boolean {
   const lagos = toZonedTime(now, LAGOS_TZ);
   return lagos.getDate() === 1;
+}
+
+async function resetWorkspaceAllowance(
+  workspace: { id: string; monthlyAllowance: number },
+): Promise<number> {
+  const users = await prisma.user.findMany({
+    where: {
+      workspaceId: workspace.id,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (users.length === 0) {
+    logger.info("No active users found for workspace", { workspaceId: workspace.id });
+    return 0;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const user of users) {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          coinsToGive: workspace.monthlyAllowance,
+        },
+      });
+
+      await tx.coinTransaction.create({
+        data: {
+          userId: user.id,
+          workspaceId: workspace.id,
+          type: "ALLOWANCE_GRANT",
+          amount: workspace.monthlyAllowance,
+        },
+      });
+    }
+  });
+
+  logger.info("Workspace reset complete", {
+    workspaceId: workspace.id,
+    usersReset: users.length,
+  });
+
+  return users.length;
+}
+
+export async function triggerMonthlyResetForWorkspace(
+  workspaceId: string,
+): Promise<{ ok: true; resetUsers: number }> {
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: {
+      id: true,
+      monthlyAllowance: true,
+    },
+  });
+
+  if (!workspace) {
+    throw new AppError("Workspace not found", "WORKSPACE_NOT_FOUND", 404);
+  }
+
+  const resetUsers = await resetWorkspaceAllowance(workspace);
+  return { ok: true, resetUsers };
 }
 
 /**
@@ -48,55 +113,30 @@ export async function runMonthlyResetJob(options?: {
   });
 
   let totalResetUsers = 0;
+  const failedWorkspaces: Array<{ workspaceId: string; error: string }> = [];
 
   for (const workspace of workspaces) {
     try {
-      const users = await prisma.user.findMany({
-        where: {
-          workspaceId: workspace.id,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-
-      if (users.length === 0) {
-        logger.info("No active users found for workspace", { workspaceId: workspace.id });
-        continue;
-      }
-
-      await prisma.$transaction(async (tx) => {
-        for (const user of users) {
-          await tx.user.update({
-            where: { id: user.id },
-            data: {
-              coinsToGive: workspace.monthlyAllowance,
-            },
-          });
-
-          await tx.coinTransaction.create({
-            data: {
-              userId: user.id,
-              workspaceId: workspace.id,
-              type: "ALLOWANCE_GRANT",
-              amount: workspace.monthlyAllowance,
-            },
-          });
-        }
-      });
-
-      totalResetUsers += users.length;
-      logger.info("Workspace reset complete", {
-        workspaceId: workspace.id,
-        usersReset: users.length,
-      });
+      totalResetUsers += await resetWorkspaceAllowance(workspace);
     } catch (workspaceError) {
+      const message =
+        workspaceError instanceof Error ? workspaceError.message : "Unknown error";
       logger.error("Workspace reset failed", {
         workspaceId: workspace.id,
-        error: workspaceError instanceof Error ? workspaceError.message : "Unknown error",
+        error: message,
       });
+      failedWorkspaces.push({ workspaceId: workspace.id, error: message });
     }
   }
 
-  logger.info("Job completed", { totalResetUsers });
-  return { ok: true, totalResetUsers };
+  logger.info("Job completed", {
+    totalResetUsers,
+    failedWorkspaces: failedWorkspaces.length,
+  });
+
+  return {
+    ok: failedWorkspaces.length === 0,
+    totalResetUsers,
+    ...(failedWorkspaces.length ? { failedWorkspaces } : {}),
+  };
 }
