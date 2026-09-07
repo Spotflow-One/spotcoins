@@ -50,4 +50,21 @@ describe("monthly-reset Netlify wrapper", () => {
       expect(call.data).not.toHaveProperty("spotTokensEarned");
     }
   });
+
+  it("returns 500 when a workspace reset fails", async () => {
+    mockPrisma.workspace.findMany.mockResolvedValue([{ id: "ws-1", monthlyAllowance: 5 }]);
+    mockPrisma.user.findMany.mockResolvedValue([{ id: "u1" }]);
+    mockPrisma.$transaction.mockRejectedValue(new Error("db write failed"));
+
+    const monthlyReset = (await import("../../netlify/functions/monthly-reset.mts")).default;
+    const response = await monthlyReset();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toMatchObject({
+      ok: false,
+      totalResetUsers: 0,
+      failedWorkspaces: [{ workspaceId: "ws-1", error: "db write failed" }],
+    });
+  });
 });

@@ -137,6 +137,7 @@ export default function AdminSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [runningMonthlyReset, setRunningMonthlyReset] = useState(false);
   const [sendingFriday, setSendingFriday] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
   const { toast, showToast } = useToast();
@@ -469,6 +470,26 @@ export default function AdminSettingsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleRunMonthlyReset = async () => {
+    setRunningMonthlyReset(true);
+    try {
+      const response = await fetch("/api/admin/monthly-reset", { method: "POST" });
+      const payload = (await response.json()) as { data?: { resetUsers: number }; error?: string };
+      if (!response.ok) {
+        showToast(payload.error ?? "Could not run monthly reset", "error");
+        return;
+      }
+      await loadSettings();
+      showToast(
+        payload.data?.resetUsers != null
+          ? `Monthly reset completed for ${payload.data.resetUsers} user(s)`
+          : "Monthly reset completed",
+      );
+    } finally {
+      setRunningMonthlyReset(false);
+    }
+  };
+
   const handleSendRecognitionFriday = async () => {
     setSendingFriday(true);
     try {
@@ -535,6 +556,23 @@ export default function AdminSettingsPage() {
               setModal({ type: "monthlyAllowance", value: workspace.monthlyAllowance })
             }
           />
+          <div className="rounded-[16px] border border-border bg-card p-4">
+            <p className="text-sm font-medium text-foreground">Monthly reset</p>
+            <p className="mt-0.5 text-[11px] text-muted">
+              Refill `Coins to Give` for this workspace now to validate the monthly allowance flow.
+            </p>
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={runningMonthlyReset}
+                onClick={() => void handleRunMonthlyReset()}
+              >
+                {runningMonthlyReset ? "Running..." : "Run monthly reset now"}
+              </Button>
+            </div>
+          </div>
           <SettingRow
             icon={<Sparkles size={15} />}
             title="Token value (NGN)"

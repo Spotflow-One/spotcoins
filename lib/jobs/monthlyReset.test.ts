@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockPrisma = {
   workspace: {
     findMany: vi.fn(),
+    findUnique: vi.fn(),
   },
   user: {
     findMany: vi.fn(),
@@ -69,5 +70,60 @@ describe("runMonthlyResetJob", () => {
     expect(result.skipped).toBeUndefined();
     expect(result.totalResetUsers).toBe(0);
     expect(mockPrisma.workspace.findMany).toHaveBeenCalled();
+  });
+
+  it("returns failed workspace details when one workspace reset errors", async () => {
+    mockPrisma.workspace.findMany.mockResolvedValue([
+      { id: "ws-1", monthlyAllowance: 5 },
+      { id: "ws-2", monthlyAllowance: 3 },
+    ]);
+    mockPrisma.user.findMany
+      .mockResolvedValueOnce([{ id: "u1" }])
+      .mockResolvedValueOnce([{ id: "u2" }]);
+
+    const tx = {
+      user: {
+        update: vi.fn().mockResolvedValue({}),
+      },
+      coinTransaction: {
+        create: vi.fn().mockResolvedValue({}),
+      },
+    };
+    mockPrisma.$transaction
+      .mockImplementationOnce(async (cb: any) => cb(tx))
+      .mockRejectedValueOnce(new Error("db write failed"));
+
+    const { runMonthlyResetJob } = await import("@/lib/jobs/monthlyReset");
+    const result = await runMonthlyResetJob({ requireLagosMonthStart: false });
+
+    expect(result.ok).toBe(false);
+    expect(result.totalResetUsers).toBe(1);
+    expect(result.failedWorkspaces).toEqual([
+      { workspaceId: "ws-2", error: "db write failed" },
+    ]);
+  });
+
+  it("triggers monthly reset for one workspace only", async () => {
+    mockPrisma.workspace.findUnique.mockResolvedValue({ id: "ws-1", monthlyAllowance: 5 });
+    mockPrisma.user.findMany.mockResolvedValue([{ id: "u1" }, { id: "u2" }]);
+
+    const tx = {
+      user: {
+        update: vi.fn().mockResolvedValue({}),
+      },
+      coinTransaction: {
+        create: vi.fn().mockResolvedValue({}),
+      },
+    };
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(tx));
+
+    const { triggerMonthlyResetForWorkspace } = await import("@/lib/jobs/monthlyReset");
+    const result = await triggerMonthlyResetForWorkspace("ws-1");
+
+    expect(mockPrisma.workspace.findUnique).toHaveBeenCalledWith({
+      where: { id: "ws-1" },
+      select: { id: true, monthlyAllowance: true },
+    });
+    expect(result).toEqual({ ok: true, resetUsers: 2 });
   });
 });

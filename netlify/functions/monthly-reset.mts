@@ -5,8 +5,9 @@ export default async () => {
   try {
     // Netlify schedule already targets month start; do not double-gate on Lagos date here.
     const result = await runMonthlyResetJob({ requireLagosMonthStart: false });
+    const status = result.ok ? 200 : 500;
     return new Response(JSON.stringify(result), {
-      status: 200,
+      status,
       headers: { "content-type": "application/json" },
     });
   } catch (err) {
